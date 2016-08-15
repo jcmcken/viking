@@ -1,5 +1,5 @@
 from viking.tests import TestCase, Fixture
-from viking.enumerators import FileEnumerator
+from viking.enumerators import FileEnumerator, ScriptEnumerator
 import tempfile
 import os
 
@@ -19,3 +19,18 @@ class TestEnumerators(TestCase):
         enum = FileEnumerator(Fixture.get('enumerators/empty-hosts.txt').uri)
         
         self.assertEquals(list(enum), [])
+
+    def test_empty_script(self):
+        enum = ScriptEnumerator(Fixture.get('enumerators/empty-hosts.sh').uri)
+        
+        self.assertEquals(list(enum), [])
+
+    def test_failing_script(self):
+        enum = ScriptEnumerator(Fixture.get('enumerators/error-hosts.sh').uri)
+
+        self.assertRaises(RuntimeError, lambda: list(enum))
+
+    def test_successful_script(self):
+        enum = ScriptEnumerator(Fixture.get('enumerators/clean-hosts.sh').uri)
+
+        self.assertEquals(list(enum), ['host1', 'host3', 'host4', 'host5'])

@@ -2,13 +2,13 @@ from viking.core import Plugin
 import collections
 
 class Queue(Plugin):
-    def push(self, item):
+    def push(self, item): # pragma: no cover
         raise NotImplementedError
 
-    def pop(self):
+    def pop(self): # pragma: no cover
         raise NotImplementedError
 
-    def count(self):
+    def count(self): # pragma: no cover
         raise NotImplementedError
 
 class MemoryQueue(Queue):
