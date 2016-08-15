@@ -2,6 +2,9 @@ from viking.core import Plugin
 import collections
 
 class Queue(Plugin):
+    plugin_namespace = 'queues'
+    abstract_plugin = True
+
     def push(self, item): # pragma: no cover
         raise NotImplementedError
 
@@ -12,6 +15,8 @@ class Queue(Plugin):
         raise NotImplementedError
 
 class MemoryQueue(Queue):
+    plugin_name = 'memory'
+
     def __init__(self, *args, **kwargs):
         super(MemoryQueue, self).__init__(*args, **kwargs)
 

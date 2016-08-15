@@ -3,6 +3,9 @@ from viking.util import Script
 import subprocess
 
 class Enumerator(Plugin):
+    plugin_namespace = 'enumerators'
+    abstract_plugin = True
+
     def __iter__(self): # pragma: no cover
         raise NotImplementedError 
 
@@ -16,6 +19,8 @@ def get_hosts(line):
         yield item
 
 class FileEnumerator(Enumerator):
+    plugin_name = 'file'
+
     def __iter__(self):
         with open(self.uri.path, 'rb') as fd:
             for line in fd:
@@ -23,6 +28,8 @@ class FileEnumerator(Enumerator):
                     yield host
 
 class ScriptEnumerator(Enumerator):
+    plugin_name = 'script'
+
     def __iter__(self):
         script = Script(self.uri.path)
         proc = subprocess.Popen(
