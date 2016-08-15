@@ -1,7 +1,5 @@
 import urlparse
-
-class BaseMeta:
-    pass
+import logging
 
 class PluginMeta(type):
     def __init__(cls, name, bases, namespace):
@@ -33,7 +31,7 @@ class Plugin(object):
         return cls.map.get(namespace, {}).get(name, None)
 
     @classmethod
-    def load(cls, namespace, uri):
+    def load(cls, namespace, uri, **settings):
         parsed_uri = urlparse.urlparse(uri)
         klass = cls.get_class(namespace, parsed_uri.scheme)
-        return klass(uri)
+        return klass(uri, **settings)
