@@ -4,11 +4,6 @@ import tempfile
 import os
 
 class TestEnumerators(TestCase):
-    def setUp(self):
-        super(TestEnumerators, self).setUp()
-
-        self.fdno, self.filename = tempfile.mkstemp()
-
     def test_clean_file(self):
         enum = FileEnumerator(Fixture.get('enumerators/clean-hosts.txt').uri)
 
@@ -20,3 +15,7 @@ class TestEnumerators(TestCase):
         self.assertEquals(list(enum), 
             ['host1', 'host4', 'host5', 'host6', 'host7'])
 
+    def test_empty_file(self):
+        enum = FileEnumerator(Fixture.get('enumerators/empty-hosts.txt').uri)
+        
+        self.assertEquals(list(enum), [])
