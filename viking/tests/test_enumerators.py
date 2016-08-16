@@ -1,4 +1,5 @@
 from viking.tests import TestCase, Fixture
+from viking.core import Plugin
 from viking.enumerators import FileEnumerator, ScriptEnumerator
 import tempfile
 import os
@@ -34,3 +35,13 @@ class TestEnumerators(TestCase):
         enum = ScriptEnumerator(Fixture.get('enumerators/clean-hosts.sh').uri)
 
         self.assertEquals(list(enum), ['host1', 'host3', 'host4', 'host5'])
+
+    def test_null_enumerator(self):
+        self.assertEquals(list(Plugin.load('enumerators', 'null://')), [])
+
+    def test_single_enumerator(self):
+        self.assertEquals(list(Plugin.load('enumerators', 'single://foo')), ['foo'])
+
+    def test_list_enumerator(self):
+        self.assertEquals(list(Plugin.load('enumerators', 'list://foo,bar,baz')),
+          ['foo', 'bar', 'baz'])

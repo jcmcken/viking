@@ -6,3 +6,6 @@ class Storage(Plugin):
 
     def store(self, task):
         raise NotImplementedError
+
+class TerminalStorage(Storage):
+    plugin_name = 'terminal'

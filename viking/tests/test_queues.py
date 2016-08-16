@@ -20,7 +20,6 @@ class TestMemoryQueue(TestCase):
         self.queue.push('foo')
         self.queue.push('bar')
         self.assertEquals(self.queue.count(), 2)
-        self.assertEquals(self.queue.pop(), 'bar')
-        self.assertEquals(self.queue.pop(), 'foo')
+        items = set([self.queue.pop(), self.queue.pop()])
+        self.assertEquals(items, set(['foo', 'bar']))
         self.assertEquals(self.queue.count(), 0)
-

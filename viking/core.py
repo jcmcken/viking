@@ -1,6 +1,8 @@
 import urlparse
 import logging
 
+class PluginLoadError(RuntimeError): pass
+
 class PluginMeta(type):
     def __init__(cls, name, bases, namespace):
         super(PluginMeta, cls).__init__(name, bases, namespace)
@@ -14,24 +16,26 @@ class PluginMeta(type):
             raise TypeError('plugin %s is incorrectly defined, must have both a '
                             '"plugin_name" and "plugin_namespace" defined' % name)
 
-        Plugin.map.setdefault(cls.plugin_namespace, {})
-        Plugin.map[cls.plugin_namespace][cls.plugin_name] = cls
+        Plugin.registry.setdefault(cls.plugin_namespace, {})
+        Plugin.registry[cls.plugin_namespace][cls.plugin_name] = cls
 
 class Plugin(object):
     __metaclass__ = PluginMeta
 
-    map = {}
+    registry = {}
     abstract_plugin = True
 
     def __init__(self, uri):
         self.uri = urlparse.urlparse(uri)
 
     @classmethod
-    def get_class(cls, namespace, name):
-        return cls.map.get(namespace, {}).get(name, None)
+    def get_class(cls, namespace, uri):
+        parsed_uri = urlparse.urlparse(uri)
+        return cls.registry.get(namespace, {}).get(parsed_uri.scheme, None)
 
     @classmethod
     def load(cls, namespace, uri, **settings):
-        parsed_uri = urlparse.urlparse(uri)
-        klass = cls.get_class(namespace, parsed_uri.scheme)
+        klass = cls.get_class(namespace, uri)
+        if not klass:
+            raise PluginLoadError(namespace, uri)
         return klass(uri, **settings)

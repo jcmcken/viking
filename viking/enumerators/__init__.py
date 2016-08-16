@@ -18,6 +18,26 @@ def get_hosts(line):
     for item in line.split():
         yield item
 
+class NullEnumerator(Enumerator):
+    plugin_name = 'null'
+
+    def __iter__(self):
+        return
+        yield
+
+class SingleEnumerator(Enumerator):
+    plugin_name = 'single'
+
+    def __iter__(self):
+        yield self.uri.netloc
+
+class ListEnumerator(Enumerator):
+    plugin_name = 'list'
+
+    def __iter__(self):
+        for host in self.uri.netloc.split(','):
+            yield host.strip()
+
 class FileEnumerator(Enumerator):
     plugin_name = 'file'
 
