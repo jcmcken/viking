@@ -50,6 +50,9 @@ class Task(object):
         if self.successful:
             self.log.debug('successfully completed task after %d execution(s)' % self.times_executed)
 
+    def format(self, formatter):
+        return self.result.formatter(formatter).format(self)
+
 class Worker(threading.Thread):
     def __init__(self, work_queue, results_queue):
         super(Worker, self).__init__()
@@ -90,24 +93,6 @@ class ThreadPool(object):
         self.started = False
         for _ in range(num_threads):
             self.threads.append(Worker(self.work_queue, self.results_queue))
-
-    def iter_results(self, timeout=10):
-        """
-        Iterate through the task return results. If a return result isn't
-        available for ``timeout`` seconds (defaults to 10), assume there
-        are no more results and stop iterating.
-        """
-        while True:
-            if self.queued_tasks == self.finished_tasks:
-                # no need to wait for new results, we're done
-                break
-            try:
-                result = self.results_queue.get(True, timeout)
-                self.finished_tasks += 1
-                yield result
-            except Empty:
-                break
-        raise StopIteration
 
     def start(self):
         for thread in self.threads:

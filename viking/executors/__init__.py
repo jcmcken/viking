@@ -16,6 +16,13 @@ class Executor(Plugin):
         raise NotImplementedError
 
 class Result(dict):
+    def __init__(self, *args, **kwargs):
+        super(Result, self).__init__(*args, **kwargs)
+
+        self.formatters = {}
+
+        self.register_formatters()
+
     @property
     def success(self):
         """
@@ -23,18 +30,35 @@ class Result(dict):
         """
         return True
 
-    @property
-    def description(self):
-        """
-        A human-readable description of the result. Usually, if the result is 
-        successful, it should be okay to return ``None``.
-        """
-        return None
+    def format_json(self, task):
+        return json.dumps(dict(self))
+
+    def register_formatters(self):
+        self.register_formatter('json', self.format_json)
+
+    def register_formatter(self, name, callable):
+        self.formatters[name] = callable
+
+    def formatter(self, formatter):
+        formatter = self.formatters.get(formatter)
+
+        if not formatter:
+            raise ResultError('no such formatter "%s"' % formatter)
+
+        return formatter
 
 class SSHResult(Result):
     @property
     def success(self):
         return self.get('returncode') == 0
+
+    def format_pssh(self, task):
+        pass
+
+    def register_formatters(self):
+        super(SSHResult, self).register_formatters()
+
+        self.register_formatter('pssh', self.format_pssh)
 
 class NullExecutor(Executor):
     plugin_name = 'null'
@@ -49,7 +73,13 @@ class ExternalSSHExecutor(Executor):
         full_command = ['ssh', self.host, self.command]
         proc = subprocess.Popen(full_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = proc.communicate()
-        return SSHResult(stdout=stdout, stderr=stderr, returncode=proc.returncode)
+        return SSHResult(
+          stdout=stdout,
+          stderr=stderr,
+          returncode=proc.returncode,
+          host=self.host,
+          command=self.command,
+        )
 
 # TODO: paramiko-based 'internal-ssh' executor
 # TODO: SSH client options, etc.
