@@ -1,4 +1,5 @@
 from viking.core import Plugin
+from urlparse import urlparse
 import logging
 
 class Executor(Plugin):
@@ -40,7 +41,9 @@ class Result(dict):
         self.formatters[name] = callable
 
     def formatter(self, formatter):
-        formatter = self.formatters.get(formatter)
+        uri = urlparse(formatter)
+
+        formatter = self.formatters.get(uri.scheme)
 
         if not formatter:
             raise ResultError('no such formatter "%s"' % formatter)

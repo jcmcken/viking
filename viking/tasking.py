@@ -1,4 +1,4 @@
-from Queue import Queue
+import Queue
 import threading
 import uuid
 import logging
@@ -6,6 +6,7 @@ import time
 from viking.executors import Executor
 from viking.queues import MemoryQueue
 from viking.core import Plugin, PluginLoadError
+from viking.util import StoppableThread
 import datetime
 
 class Task(object):
@@ -53,7 +54,7 @@ class Task(object):
     def format(self, formatter):
         return self.result.formatter(formatter).format(self)
 
-class Worker(threading.Thread):
+class Worker(StoppableThread):
     def __init__(self, work_queue, results_queue):
         super(Worker, self).__init__()
 
@@ -67,6 +68,8 @@ class Worker(threading.Thread):
 
     def run(self):
         while True:
+            if self.should_stop: return
+
             try:
                 task = self.work_queue.get()
             except Empty:
@@ -85,8 +88,8 @@ class Worker(threading.Thread):
 
 class ThreadPool(object):
     def __init__(self, work_queue=None, results_queue=None, num_threads=5):
-        self.work_queue = work_queue or Queue()
-        self.results_queue = results_queue or Queue()
+        self.work_queue = work_queue or Queue.Queue()
+        self.results_queue = results_queue or Queue.Queue()
         self.queued_tasks = 0
         self.finished_tasks = 0
         self.threads = []
@@ -100,6 +103,10 @@ class ThreadPool(object):
         self.started = True
 
     def stop(self):
+        for thread in self.threads:
+            thread.stop()
+
+    def join(self):
         self.work_queue.join()
         self.started = False
 
@@ -109,26 +116,36 @@ class ThreadPool(object):
         self.queued_tasks += 1
         self.work_queue.put(task)
 
-class StorageWriter(threading.Thread):
-    def __init__(self, storage, queue):
+class StorageWriter(StoppableThread):
+    def __init__(self, storage, queue, formatter='terminal://'):
         super(StorageWriter, self).__init__()
         self.storage = storage
         self.queue = queue
+        self.formatter = formatter
+        self.paused = False
 
     def run(self):
-        pass
+        while True:
+            if self.should_stop: return
 
-    stop = threading.Thread.join
+            try:
+                finished_task = self.queue.get_nowait()
+            except Queue.Empty:
+                time.sleep(0.5)
+                continue
+    
+            self.storage.store(finished_task.format(self.formatter))
 
 class TaskManager(object):
     def __init__(self, threads=5, 
       enumerator='null://',
       queue='memory://',
       executor='external-ssh://',
-      storage='terminal://'):
+      storage='terminal://',
+      formatter='terminal://'):
 
         self.work_queue = Plugin.load('queues', queue)
-        self.results_queue = Queue()
+        self.results_queue = Queue.Queue()
 
         self.pool = ThreadPool(
           num_threads=threads,
@@ -145,7 +162,8 @@ class TaskManager(object):
 
         self.storage = Plugin.load('storage', storage)
 
-        self.storage_writer = StorageWriter(self.storage, self.results_queue)
+        self.storage_writer = StorageWriter(self.storage, self.results_queue,
+            formatter=formatter)
 
     def run(self, command=None):
         local_queue = self.work_queue.plugin_name == 'memory'
@@ -167,5 +185,5 @@ class TaskManager(object):
                 self.pool.add_task(task)
 
         if execution_enabled:
-            self.pool.stop()
+            self.pool.join()
             self.storage_writer.stop()
