@@ -52,7 +52,7 @@ class Task(object):
             self.log.debug('successfully completed task after %d execution(s)' % self.times_executed)
 
     def format(self, formatter):
-        return self.result.formatter(formatter).format(self)
+        return self.result.formatter(formatter)(self)
 
 class Worker(StoppableThread):
     def __init__(self, work_queue, results_queue):
@@ -142,7 +142,7 @@ class TaskManager(object):
       queue='memory://',
       executor='external-ssh://',
       storage='terminal://',
-      formatter='terminal://'):
+      formatter='json://'):
 
         self.work_queue = Plugin.load('queues', queue)
         self.results_queue = Queue.Queue()

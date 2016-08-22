@@ -1,6 +1,8 @@
 from viking.core import Plugin
 from urlparse import urlparse
+import subprocess
 import logging
+import json
 
 class Executor(Plugin):
     plugin_namespace = 'executors'
@@ -16,6 +18,7 @@ class Executor(Plugin):
         """
         raise NotImplementedError
 
+class ResultError(RuntimeError): pass
 class Result(dict):
     def __init__(self, *args, **kwargs):
         super(Result, self).__init__(*args, **kwargs)
