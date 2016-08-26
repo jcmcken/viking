@@ -1,8 +1,10 @@
 from viking.core import Plugin
-from urlparse import urlparse
 import subprocess
 import logging
 import json
+from viking.util import URI
+
+LOG = logging.getLogger(__name__)
 
 class Executor(Plugin):
     plugin_namespace = 'executors'
@@ -23,9 +25,9 @@ class Result(dict):
     def __init__(self, *args, **kwargs):
         super(Result, self).__init__(*args, **kwargs)
 
-        self.formatters = {}
+        self.serializers = {}
 
-        self.register_formatters()
+        self.register_serializers()
 
     @property
     def success(self):
@@ -34,37 +36,62 @@ class Result(dict):
         """
         return True
 
-    def format_json(self, task):
-        return json.dumps(dict(self))
+    def serialize_json(self, task, indent=None, sort_keys=None):
+        return json.dumps(dict(self), indent=indent, sort_keys=sort_keys)
 
-    def register_formatters(self):
-        self.register_formatter('json', self.format_json)
+    def register_serializers(self):
+        self.register_serializer('json', self.serialize_json)
 
-    def register_formatter(self, name, callable):
-        self.formatters[name] = callable
+    def register_serializer(self, name, callable):
+        self.serializers[name] = callable
 
-    def formatter(self, formatter):
-        uri = urlparse(formatter)
+    def serializer(self, serializer):
+        uri = URI.parse(serializer)
 
-        formatter = self.formatters.get(uri.scheme)
+        serializer = self.serializers.get(uri.scheme)
 
-        if not formatter:
-            raise ResultError('no such formatter "%s"' % formatter)
+        if not serializer:
+            raise ResultError('no such serializer "%s"' % serializer)
 
-        return formatter
+        return lambda task: serializer(task, **uri.kwargs)
 
 class SSHResult(Result):
     @property
     def success(self):
         return self.get('returncode') == 0
 
-    def format_pssh(self, task):
-        pass
+    def serialize_pssh(self, task):
+        if self.success:
+            success_msg = 'SUCCESS'
+        else:
+            success_msg = 'FAILURE'
 
-    def register_formatters(self):
-        super(SSHResult, self).register_formatters()
+        context = {
+          'index': task.metadata['index'],
+          'timestamp': task.updated_at.strftime('%H:%M:%S'),
+          'success': success_msg,
+          'host': self['host'],
+          'returncode': self['returncode'],
+          'stdout': self['stdout'],
+          'stderr': self['stderr'],
+        }
 
-        self.register_formatter('pssh', self.format_pssh)
+        result = "[%(index)d] %(timestamp)s [%(success)s] %(host)s"
+        
+        if not self.success:
+            result += " Exited with error code %(returncode)d"
+
+        result += "\n%(stdout)s"
+
+        if self.get('stderr'):
+            result += '\nStderr: %(stderr)s'
+
+        return result % context
+
+    def register_serializers(self):
+        super(SSHResult, self).register_serializers()
+
+        self.register_serializer('pssh', self.serialize_pssh)
 
 class NullExecutor(Executor):
     plugin_name = 'null'
@@ -76,9 +103,21 @@ class ExternalSSHExecutor(Executor):
     plugin_name = 'external-ssh'
 
     def execute(self):
-        full_command = ['ssh', self.host, self.command]
+        full_command = ['ssh', '-q', '-o', 'StrictHostKeyChecking=no', '-o', 'BatchMode=yes', self.host] + list(self.command)
+        LOG.debug("executing subprocess command: %s" % full_command)
         proc = subprocess.Popen(full_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = proc.communicate()
+
+        truncated_stdout, truncated_stderr = stdout[:20], stderr[:20]
+
+        if len(stdout) > len(truncated_stdout):
+            truncated_stdout += '...'
+        if len(stderr) > len(truncated_stderr):
+            truncated_stderr += '...'
+
+        LOG.debug('command results: returncode=%d, stdout="%s", stderr="%s"' % \
+          (proc.returncode, truncated_stdout, truncated_stderr))
+
         return SSHResult(
           stdout=stdout,
           stderr=stderr,

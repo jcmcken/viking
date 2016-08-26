@@ -22,6 +22,7 @@ class Task(object):
         self.result = None
         self.created_at = datetime.datetime.now()
         self.updated_at = datetime.datetime.now()
+        self.metadata = {}
 
     @property
     def elapsed(self):
@@ -51,8 +52,8 @@ class Task(object):
         if self.successful:
             self.log.debug('successfully completed task after %d execution(s)' % self.times_executed)
 
-    def format(self, formatter):
-        return self.result.formatter(formatter)(self)
+    def serialize(self, serializer):
+        return self.result.serializer(serializer)(self)
 
 class Worker(StoppableThread):
     def __init__(self, work_queue, results_queue):
@@ -68,11 +69,10 @@ class Worker(StoppableThread):
 
     def run(self):
         while True:
-            if self.should_stop: return
-
             try:
                 task = self.work_queue.get()
             except Empty:
+                if self.should_stop: return
                 time.sleep(0.1)
                 continue
 
@@ -117,24 +117,28 @@ class ThreadPool(object):
         self.work_queue.put(task)
 
 class StorageWriter(StoppableThread):
-    def __init__(self, storage, queue, formatter='terminal://'):
+    def __init__(self, storage, queue, serializer=None):
         super(StorageWriter, self).__init__()
         self.storage = storage
         self.queue = queue
-        self.formatter = formatter
+        self.serializer = serializer
         self.paused = False
+        self.num_processed = 0
 
     def run(self):
         while True:
-            if self.should_stop: return
-
             try:
                 finished_task = self.queue.get_nowait()
             except Queue.Empty:
+                if self.should_stop: return
                 time.sleep(0.5)
                 continue
+        
+            self.num_processed += 1
+
+            finished_task.metadata['index'] = self.num_processed
     
-            self.storage.store(finished_task.format(self.formatter))
+            self.storage.store(finished_task, serializer=self.serializer)
 
 class TaskManager(object):
     def __init__(self, threads=5, 
@@ -142,7 +146,7 @@ class TaskManager(object):
       queue='memory://',
       executor='external-ssh://',
       storage='terminal://',
-      formatter='json://'):
+      serializer='json://'):
 
         self.work_queue = Plugin.load('queues', queue)
         self.results_queue = Queue.Queue()
@@ -163,7 +167,7 @@ class TaskManager(object):
         self.storage = Plugin.load('storage', storage)
 
         self.storage_writer = StorageWriter(self.storage, self.results_queue,
-            formatter=formatter)
+            serializer=serializer)
 
     def run(self, command=None):
         local_queue = self.work_queue.plugin_name == 'memory'

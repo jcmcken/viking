@@ -1,6 +1,9 @@
 from viking.core import Plugin
 from viking.util import Script
 import subprocess
+import logging
+
+LOG = logging.getLogger(__name__)
 
 class Enumerator(Plugin):
     plugin_namespace = 'enumerators'
@@ -29,20 +32,20 @@ class SingleEnumerator(Enumerator):
     plugin_name = 'single'
 
     def __iter__(self):
-        yield self.uri.netloc
+        yield self.uri.location
 
 class ListEnumerator(Enumerator):
     plugin_name = 'list'
 
     def __iter__(self):
-        for host in self.uri.netloc.split(','):
+        for host in self.uri.location.split(','):
             yield host.strip()
 
 class FileEnumerator(Enumerator):
     plugin_name = 'file'
 
     def __iter__(self):
-        with open(self.uri.path, 'rb') as fd:
+        with open(self.uri.location, 'rb') as fd:
             for line in fd:
                 for host in get_hosts(line):
                     yield host
@@ -51,7 +54,7 @@ class ScriptEnumerator(Enumerator):
     plugin_name = 'script'
 
     def __iter__(self):
-        script = Script(self.uri.path)
+        script = Script(self.uri.location)
         proc = subprocess.Popen(
             script.full_command, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         stdout, stderr = proc.communicate()

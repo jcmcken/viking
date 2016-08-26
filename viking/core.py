@@ -1,5 +1,9 @@
 import urlparse
 import logging
+from viking.util import URI
+import os
+
+LOG = logging.getLogger(__name__)
 
 class PluginLoadError(RuntimeError): pass
 
@@ -26,16 +30,25 @@ class Plugin(object):
     abstract_plugin = True
 
     def __init__(self, uri):
-        self.uri = urlparse.urlparse(uri)
+        self.uri = URI.parse(uri)
 
     @classmethod
     def get_class(cls, namespace, uri):
-        parsed_uri = urlparse.urlparse(uri)
-        return cls.registry.get(namespace, {}).get(parsed_uri.scheme, None)
+        parsed_uri = URI.parse(uri)
+        klass = cls.registry.get(namespace, {}).get(parsed_uri.scheme, None)
+        klass_name = None
+        if klass:
+            klass_name = klass.__module__ + '.' + klass.__name__
+        LOG.debug("translated plugin URI '%s' in namespace '%s' to class '%s'" % \
+          (uri, namespace, klass_name))
+        return klass
 
     @classmethod
-    def load(cls, namespace, uri, **settings):
+    def load(cls, namespace, uri):
+        if os.path.isfile(uri):
+            uri = 'file://' + uri
         klass = cls.get_class(namespace, uri)
         if not klass:
             raise PluginLoadError(namespace, uri)
-        return klass(uri, **settings)
+        kwargs = URI.parse(uri).kwargs
+        return klass(uri, **kwargs)

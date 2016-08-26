@@ -2,3 +2,4 @@ itsdangerous
 cryptography
 paramiko
 python-gssapi
+click
